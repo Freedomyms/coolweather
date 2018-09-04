@@ -1,8 +1,13 @@
 package com.yangms.coolweather.Activity;
 
 import android.app.ProgressDialog;
+import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,7 +28,7 @@ import java.util.List;
 import okhttp3.Call;
 import okhttp3.Response;
 
-public class MainActivity extends BaseActivity {
+public class MainActivity extends BaseActivity implements View.OnClickListener {
 
     public static final int LEVEL_PROVINCE = 0;
     public static final int LEVEL_CITY = 1;
@@ -32,6 +37,7 @@ public class MainActivity extends BaseActivity {
     private ProgressDialog progressDialog;
     private TextView titleText;
     private ListView listView;
+    private Button mBtnBack;
     private ArrayAdapter<String> adapter;
     //private CoolWeatherDB coolWeatherDB;
     private List<String> dataList = new ArrayList<String>();
@@ -63,16 +69,46 @@ public class MainActivity extends BaseActivity {
      * 是否从WeatherActivity中跳转过来。
      */
     private boolean isFromWeatherActivity;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        listView = (ListView) findViewById(R.id.list_view);
-        titleText = (TextView) findViewById(R.id.title_text);
+        initView();
+
         adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, dataList);
         listView.setAdapter(adapter);
         queryProvinces();  // 加载省级数据
+        setOnListViewItemClickListener();
+
     }
+
+    private void initView() {
+        listView = (ListView) findViewById(R.id.list_view);
+        titleText = (TextView) findViewById(R.id.title_text);
+        mBtnBack = (Button) findViewById(R.id.btn_back);
+
+        mBtnBack.setOnClickListener(this);
+    }
+
+    private void setOnListViewItemClickListener() {
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+                if (currentLevel == LEVEL_PROVINCE) {
+                    selectedProvince = provinceList.get(position);
+                    currentLevel = LEVEL_CITY;
+                    mBtnBack.setVisibility(View.VISIBLE);
+                    queryCities();
+                } else if (currentLevel == LEVEL_CITY) {
+                    selectedCity = cityList.get(position);
+                    currentLevel = LEVEL_COUNTY;
+                    queryCounties();
+                }
+            }
+        });
+    }
+
     /**
      * 查询全国所有的省，优先从数据库查询，如果没有查询到再去服务器上查询。
      */
@@ -84,48 +120,99 @@ public class MainActivity extends BaseActivity {
             for (Province province : provinceList) {
                 dataList.add(province.getProvinceName());
             }
+            //Log.e("ProvinceCode",provinceList.get(2).getProvinceCode()+"");
             adapter.notifyDataSetChanged();
             listView.setSelection(0);
             titleText.setText("中国");
             currentLevel = LEVEL_PROVINCE;
         } else {
             String address = "http://guolin.tech/api/china";
-            queryFromServer(address,"province");
+            queryFromServer(address, "province");
         }
     }
+
+    /**
+     * 查询选中省内所有的市，优先从数据库查询，如果没有查询到再去服务器上查询。
+     */
+    private void queryCities() {
+        titleText.setText(selectedProvince.getProvinceName());
+        cityList = DataSupport.where("provinceId = ?", String.valueOf(selectedProvince.getId())).find(City.class);
+        if (cityList.size() > 0) {
+            dataList.clear();
+            for (City city : cityList) {
+                dataList.add(city.getCityName());
+            }
+            adapter.notifyDataSetChanged();
+            listView.setSelection(0);
+            titleText.setText(selectedProvince.getProvinceName());
+            currentLevel = LEVEL_CITY;
+        } else {
+            String address = "http://guolin.tech/api/china/" + selectedProvince.getId();
+            queryFromServer(address, "city");
+        }
+    }
+
+    /**
+     * 查询选中市内所有的县，优先从数据库查询，如果没有查询到再去服务器上查询。
+     */
+    private void queryCounties() {
+        titleText.setText(selectedCity.getCityName());
+        countyList = DataSupport.where("cityId = ?", String.valueOf(selectedCity.getCityCode())).find(County.class);
+        if (countyList.size() > 0) {
+            dataList.clear();
+            for (County county : countyList) {
+                dataList.add(county.getCountyName());
+            }
+            adapter.notifyDataSetChanged();
+            listView.setSelection(0);
+            titleText.setText(selectedCity.getCityName());
+            currentLevel = LEVEL_COUNTY;
+        } else {
+            String address = "http://guolin.tech/api/china/" + selectedProvince.getId() + "/" + selectedCity.getCityCode();
+            queryFromServer(address, "county");
+        }
+    }
+
     /**
      * 根据传入的代号和类型从服务器上查询省市县数据。
+     *
      * @param
      * @param type
      */
     private void queryFromServer(String address, final String type) {
         showProgressDialog();
         HttpUtil.sendOkHttpRequest(address, new okhttp3.Callback() {
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String responseText = response.body().string();
-                boolean reult=false;
-                if ("province".equals(type)) {
-                   reult=Utility.handleProvinceResponse(responseText);
-                } else if ("city".equals(type)) {
-                   // queryCities();
-                } else if ("county".equals(type)) {
-                    //queryCounties();
-                }
-                if(reult){
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            showProgressDialog();
-                            if ("province".equals(type)) {
-                                queryProvinces();
-                            }
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        String responseText = response.body().string();
+                        boolean reult = false;
+                        if ("province".equals(type)) {
+                            reult = Utility.handleProvinceResponse(responseText);
+                        } else if ("city".equals(type)) {
+                            reult = Utility.handleCityResponse(responseText, selectedProvince.getId());
+                        } else if ("county".equals(type)) {
+                            reult = Utility.handleCountyResponse(responseText, selectedCity.getCityCode());
                         }
-                    });
-                }
-            }
+                        if (reult) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    closeProgressDialog();
+                                    if ("province".equals(type)) {
+                                        queryProvinces();
+                                    }
+                                    if ("city".equals(type)) {
+                                        queryCities();
+                                    }
+                                    if ("county".equals(type)) {
+                                        queryCounties();
+                                    }
+                                }
+                            });
+                        }
+                    }
 
-            @Override
+                    @Override
                     public void onFailure(Call call, IOException e) {
                         // 通过runOnUiThread()方法回到主线程处理逻辑
                         runOnUiThread(new Runnable() {
@@ -162,5 +249,40 @@ public class MainActivity extends BaseActivity {
             progressDialog.dismiss();
         }
     }
+
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()){
+            case R.id.btn_back:
+                if (currentLevel == LEVEL_COUNTY) {
+                    queryCities();
+                } else if (currentLevel == LEVEL_CITY) {
+                    mBtnBack.setVisibility(View.GONE);
+                    queryProvinces();
+                }
+                break;
+        }
+    }
+
+    /**
+     * 捕获Back按键，根据当前的级别来判断，此时应该返回市列表、省列表、还是直接退出。
+     */
+    @Override
+    public void onBackPressed() {
+        if (currentLevel == LEVEL_COUNTY) {
+            queryCities();
+        } else if (currentLevel == LEVEL_CITY) {
+            mBtnBack.setVisibility(View.GONE);
+            queryProvinces();
+        } else {
+            if (isFromWeatherActivity) {
+               /* Log.d(TAG, "issi");
+                Intent intent = new Intent(this, WeatherActivity.class);
+                startActivity(intent);*/
+            }
+            finish();
+        }
+    }
+
 
 }
