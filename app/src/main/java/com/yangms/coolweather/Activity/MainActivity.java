@@ -69,7 +69,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
      * 是否从WeatherActivity中跳转过来。
      */
     private boolean isFromWeatherActivity;
-
+    public static final String WEATHER_ID="weather_id";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -104,6 +104,10 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                     selectedCity = cityList.get(position);
                     currentLevel = LEVEL_COUNTY;
                     queryCounties();
+                }else if(currentLevel==LEVEL_COUNTY){
+                    Intent intent = new Intent(MainActivity.this,WeatherActivity.class);
+                    intent.putExtra(WEATHER_ID,countyList.get(position).getWeatherId());
+                    startActivity(intent);
                 }
             }
         });
