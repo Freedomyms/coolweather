@@ -70,6 +70,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
      */
     private boolean isFromWeatherActivity;
     public static final String WEATHER_ID="weather_id";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
