@@ -1,8 +1,10 @@
 package com.yangms.coolweather.Activity;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.graphics.Color;
 import android.os.Build;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -32,7 +34,8 @@ import okhttp3.Response;
 
 import static com.yangms.coolweather.Activity.MainActivity.WEATHER_ID;
 
-public class WeatherActivity extends AppCompatActivity {
+public class WeatherActivity extends BaseActivity {
+    public SwipeRefreshLayout swipeRefresh;
     private ImageView mIvBingPicImg;
     private ScrollView mSvWeatherLayout;
     private TextView mTvTitleCity, mTvTitleUpdateTime;
@@ -45,6 +48,7 @@ public class WeatherActivity extends AppCompatActivity {
     private static final String WEATHER = "weather";
     private ProgressDialog progressDialog;
     private static final String BING_PIC = "bing_pic";
+    private boolean isRefresh=false;//下拉刷新的时候Dialog不显示
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +67,8 @@ public class WeatherActivity extends AppCompatActivity {
     }
 
     private void initView() {
+        swipeRefresh = findViewById(R.id.swipe_refresh);
+        swipeRefresh.setColorSchemeResources(R.color.colorPrimary);
         mIvBingPicImg = findViewById(R.id.bing_pic_img);
         mSvWeatherLayout = findViewById(R.id.weather_layout);
 
@@ -84,14 +90,16 @@ public class WeatherActivity extends AppCompatActivity {
 
     private void initData() {
         String weatherString = PreUtil.getString(WeatherActivity.this, WEATHER, null);
-        if (weatherString != null) {
+        final String weatherId;
+        if (weatherString != null) {//有缓存直接解析天气数据
             Weather weather = Utility.handleWeatherResponse(weatherString);
-        } else {
-            String weatherId = getIntent().getStringExtra(WEATHER_ID);
+            weatherId = weather.basic.weatherId;
+        } else {//无缓存时去服务器查询天气
+            weatherId = getIntent().getStringExtra(WEATHER_ID);
             mSvWeatherLayout.setVisibility(View.INVISIBLE);
             requestWeather(weatherId);
         }
-
+        setOnSwipeRefreshListener(weatherId);
         String bingPic = PreUtil.getString(WeatherActivity.this, BING_PIC, null);
         if (bingPic != null) {
             Glide.with(this).load(bingPic).into(mIvBingPicImg);
@@ -100,6 +108,18 @@ public class WeatherActivity extends AppCompatActivity {
         }
 
     }
+    /**
+     * 下拉刷新
+     */
+  private void setOnSwipeRefreshListener(final String weatherId){
+      swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+          @Override
+          public void onRefresh() {
+              isRefresh=true;
+              requestWeather(weatherId);
+          }
+      });
+  }
     /**
      * 透明状态栏
      */
@@ -113,8 +133,11 @@ public class WeatherActivity extends AppCompatActivity {
             window.setStatusBarColor(Color.TRANSPARENT);
         }
     }
+
     private void requestWeather(final String weatherId) {
-        showProgressDialog();
+        if(!isRefresh){
+            showProgressDialog();
+        }
         String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId + "&key=bc0418b57b2d4918819d3974ac1285d9";
         // String weatherUrl1 = "http://guolin.tech/api/weather?cityid=CN101090201&key=bc0418b57b2d4918819d3974ac1285d9";
         HttpUtil.sendOkHttpRequest(weatherUrl, new Callback() {
@@ -125,7 +148,11 @@ public class WeatherActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
-                        closeProgressDialog();
+                        if(!isRefresh){
+                            closeProgressDialog();
+                        }
+                        isRefresh=false;
+                        swipeRefresh.setRefreshing(false);
                     }
                 });
             }
@@ -140,8 +167,16 @@ public class WeatherActivity extends AppCompatActivity {
                         if (weather != null && "ok".equals(weather.status)) {
                             PreUtil.setString(WeatherActivity.this, WEATHER, responseText);
                             showWeatherInfo(weather);
-                            closeProgressDialog();
+                           if(!isRefresh){
+                               closeProgressDialog();
+                           }else {
+                                   Toast.makeText(WeatherActivity.this, "天气更新成功", Toast.LENGTH_SHORT).show();
+                           }
+                        }else {
+                            Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
                         }
+                        isRefresh=false;
+                        swipeRefresh.setRefreshing(false);
                     }
                 });
             }
