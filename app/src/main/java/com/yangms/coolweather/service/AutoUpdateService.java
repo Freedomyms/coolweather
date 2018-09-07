@@ -6,6 +6,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.yangms.coolweather.Activity.WeatherActivity;
@@ -65,11 +66,12 @@ public class AutoUpdateService extends Service {
                 public void onResponse(Call call, Response response) throws IOException {
                     final String responseText = response.body().string();
                     final Weather weather = Utility.handleWeatherResponse(responseText);
-
+                    Log.e("服务成功",weather+"");
+/*
                     if (weather != null && "ok".equals(weather.status)) {
                         PreUtil.setString(getApplication().getApplicationContext(), WEATHER, responseText);
 
-                    }
+                    }*/
                 }
             });
         }

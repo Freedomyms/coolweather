@@ -12,6 +12,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -36,7 +38,7 @@ import okhttp3.Response;
 
 import static com.yangms.coolweather.Activity.MainActivity.WEATHER_ID;
 
-public class WeatherActivity extends BaseActivity implements View.OnClickListener{
+public class WeatherActivity extends BaseActivity implements View.OnClickListener {
     public DrawerLayout drawerLayout;
     private Button mBtnNav;
     public SwipeRefreshLayout swipeRefresh;
@@ -52,7 +54,7 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
     public static final String WEATHER = "weather";
     private ProgressDialog progressDialog;
     public static final String BING_PIC = "bing_pic";
-    private boolean isRefresh=false;//下拉刷新的时候Dialog不显示
+    private boolean isRefresh = false;//下拉刷新的时候Dialog不显示
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +67,8 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
     }
 
     private void initView() {
-        drawerLayout=(DrawerLayout)findViewById(R.id.drawer_layout);
-        mBtnNav=findViewById(R.id.nav_button);
+        drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        mBtnNav = findViewById(R.id.nav_button);
         swipeRefresh = findViewById(R.id.swipe_refresh);
         swipeRefresh.setColorSchemeResources(R.color.colorPrimary);
         mIvBingPicImg = findViewById(R.id.bing_pic_img);
@@ -111,18 +113,20 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
         }
 
     }
+
     /**
      * 下拉刷新
      */
-  private void setOnSwipeRefreshListener(final String weatherId){
-      swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-          @Override
-          public void onRefresh() {
-              isRefresh=true;
-              requestWeather(weatherId);
-          }
-      });
-  }
+    private void setOnSwipeRefreshListener(final String weatherId) {
+        swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                isRefresh = true;
+                requestWeather(weatherId);
+            }
+        });
+    }
+
     /**
      * 透明状态栏
      */
@@ -138,7 +142,7 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
     }
 
     private void requestWeather(final String weatherId) {
-        if(!isRefresh){
+        if (!isRefresh) {
             showProgressDialog();
         }
         String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId + "&key=bc0418b57b2d4918819d3974ac1285d9";
@@ -151,10 +155,10 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
                     @Override
                     public void run() {
                         Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
-                        if(!isRefresh){
+                        if (!isRefresh) {
                             closeProgressDialog();
                         }
-                        isRefresh=false;
+                        isRefresh = false;
                         swipeRefresh.setRefreshing(false);
                     }
                 });
@@ -170,15 +174,15 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
                         if (weather != null && "ok".equals(weather.status)) {
                             PreUtil.setString(WeatherActivity.this, WEATHER, responseText);
                             showWeatherInfo(weather);
-                           if(!isRefresh){
-                               closeProgressDialog();
-                           }else {
-                                   Toast.makeText(WeatherActivity.this, "天气更新成功", Toast.LENGTH_SHORT).show();
-                           }
-                        }else {
+                            if (!isRefresh) {
+                                closeProgressDialog();
+                            } else {
+                                Toast.makeText(WeatherActivity.this, "天气更新成功", Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
                             Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
                         }
-                        isRefresh=false;
+                        isRefresh = false;
                         swipeRefresh.setRefreshing(false);
                     }
                 });
@@ -220,7 +224,7 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
         mTvSportText.setText(sport);
         mSvWeatherLayout.setVisibility(View.VISIBLE);
 
-        Intent intent  = new Intent(this, AutoUpdateService.class);
+        Intent intent = new Intent(this, AutoUpdateService.class);
         startService(intent);
     }
 
@@ -248,9 +252,31 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
 
     @Override
     public void onClick(View v) {
-        switch (v.getId()){
+        switch (v.getId()) {
             case R.id.nav_button:
-                drawerLayout.openDrawer(GravityCompat.START);
+
+                final RotateAnimation rotateAnim = new RotateAnimation(0, 90, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+                rotateAnim.setDuration(500);
+                rotateAnim.setFillAfter(true);
+                mBtnNav.startAnimation(rotateAnim);
+                rotateAnim.setAnimationListener(new Animation.AnimationListener() {
+                    @Override
+                    public void onAnimationStart(Animation animation) {
+
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animation animation) {
+                        drawerLayout.openDrawer(GravityCompat.START);
+                        rotateAnim.cancel();
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(Animation animation) {
+
+                    }
+                });
+
                 break;
         }
     }
@@ -278,8 +304,8 @@ public class WeatherActivity extends BaseActivity implements View.OnClickListene
 
     @Override
     public void onBackPressed() {
-       /* PreUtil.setString(WeatherActivity.this, WEATHER, null);
-        PreUtil.setString(WeatherActivity.this, BING_PIC, null);*/
+        PreUtil.setString(WeatherActivity.this, WEATHER, null);
+        PreUtil.setString(WeatherActivity.this, BING_PIC, null);
         super.onBackPressed();
     }
 }
